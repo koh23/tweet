@@ -23,7 +23,12 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
 
+	"github.com/dghubble/go-twitter/twitter"
+	"github.com/dghubble/oauth1"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -40,8 +45,41 @@ This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("stream called")
-		var consumerKey = viper.GetString("consumer_key")
-		fmt.Println(consumerKey)
+		consumerKey := viper.GetString("consumer_key")
+		consumerSecret := viper.GetString("consumer_secret")
+		oauthToken := viper.GetString("oauth_token")
+		oauthTokenSecret := viper.GetString("oauth_token_secret")
+		config := oauth1.NewConfig(consumerKey, consumerSecret)
+		token := oauth1.NewToken(oauthToken, oauthTokenSecret)
+		httpClient := config.Client(oauth1.NoContext, token)
+		client := twitter.NewClient(httpClient)
+
+		params := &twitter.StreamSampleParams{
+			StallWarnings: twitter.Bool(true),
+		}
+		stream, err := client.Streams.Sample(params)
+		if err != nil {
+			fmt.Println("Client Error!")
+		}
+		// receive message
+		demux := twitter.NewSwitchDemux()
+		demux.Tweet = func(tweet *twitter.Tweet) {
+			//fmt.Println("[INFO]", tweet.Text)
+			//fmt.Println("[INFO]", tweet.Lang)
+			ext := tweet.ExtendedEntities
+			if ext != nil {
+				for _, media := range ext.Media {
+					fmt.Println(media.MediaURLHttps)
+				}
+			}
+		}
+		go demux.HandleChan(stream.Messages)
+
+		// Wait for SIGINT and SIGTERM (HIT CTRL-C)
+		ch := make(chan os.Signal)
+		signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
+		fmt.Println(<-ch)
+		stream.Stop()
 	},
 }
 
