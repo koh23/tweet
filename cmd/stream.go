@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/dghubble/go-twitter/twitter"
@@ -44,7 +45,6 @@ Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("stream called")
 		consumerKey := viper.GetString("consumer_key")
 		consumerSecret := viper.GetString("consumer_secret")
 		oauthToken := viper.GetString("oauth_token")
@@ -67,9 +67,11 @@ to quickly create a Cobra application.`,
 			//fmt.Println("[INFO]", tweet.Text)
 			//fmt.Println("[INFO]", tweet.Lang)
 			ext := tweet.ExtendedEntities
-			if ext != nil {
+			if ext != nil && tweet.Lang == "ja" && tweet.Text[:2] != "RT" {
 				for _, media := range ext.Media {
-					fmt.Println(media.MediaURLHttps)
+					if strings.HasPrefix(media.MediaURLHttps, "https://pbs.twimg.com/media/") && strings.HasSuffix(media.MediaURLHttps, ".jpg") {
+						fmt.Println(tweet.Text, media.MediaURLHttps)
+					}
 				}
 			}
 		}
